@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "test": "node --experimental-strip-types --test src/index.test.ts"
   },
   "keywords": [],
   "type": "module",
