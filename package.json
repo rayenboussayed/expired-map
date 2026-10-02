@@ -1,14 +1,49 @@
 {
   "name": "map-ttl",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "A Map with per-entry TTL expiration and optional LRU/LFU eviction",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsc",
-    "test": "node --experimental-strip-types --test src/index.test.ts"
+    "test": "node --experimental-strip-types --test src/index.test.ts",
+    "prepublishOnly": "npm run build"
   },
-  "keywords": [],
+  "keywords": [
+    "map",
+    "ttl",
+    "cache",
+    "lru",
+    "lfu",
+    "eviction",
+    "expiry",
+    "expiration",
+    "typescript"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rayenboussayed/map-ttl.git"
+  },
+  "homepage": "https://github.com/rayenboussayed/map-ttl#readme",
+  "bugs": {
+    "url": "https://github.com/rayenboussayed/map-ttl/issues"
+  },
+  "license": "MIT",
   "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
   "devDependencies": {
     "@types/node": "^26.6.4",
     "typescript": "^6.0.3"
