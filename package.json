@@ -1,7 +1,7 @@
 {
-  "name": "map-ttl",
+  "name": "expired-map",
   "version": "1.0.0",
-  "description": "A Map with per-entry TTL expiration and optional LRU/LFU eviction",
+  "description": "A Map with per-entry TTL expiration and optional FIFO/LRU/LFU eviction",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -24,6 +24,7 @@
     "map",
     "ttl",
     "cache",
+    "fifo",
     "lru",
     "lfu",
     "eviction",
@@ -33,11 +34,11 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/rayenboussayed/map-ttl.git"
+    "url": "git+https://github.com/rayenboussayed/expired-map.git"
   },
-  "homepage": "https://github.com/rayenboussayed/map-ttl#readme",
+  "homepage": "https://github.com/rayenboussayed/expired-map#readme",
   "bugs": {
-    "url": "https://github.com/rayenboussayed/map-ttl/issues"
+    "url": "https://github.com/rayenboussayed/expired-map/issues"
   },
   "license": "MIT",
   "type": "module",

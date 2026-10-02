@@ -1,8 +1,8 @@
-import { MapTtl } from '../dist/index.js';
+import { ExpiredMap } from '../dist/index.js';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const cache = new MapTtl({ defaultTtl: 500 });
+const cache = new ExpiredMap({ defaultTtl: 500 });
 
 cache.set('fast', 1, 60); // expires in 60ms
 cache.set('slow', 2); // expires in 500ms (defaultTtl)

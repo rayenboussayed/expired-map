@@ -1,7 +1,7 @@
-import { MapTtl } from '../dist/index.js';
+import { ExpiredMap } from '../dist/index.js';
 
 // Seeded entries each get defaultTtl; eviction applies if over maxSize.
-const cache = new MapTtl({
+const cache = new ExpiredMap({
   defaultTtl: 10_000,
   entries: [
     ['a', 1],
@@ -10,7 +10,7 @@ const cache = new MapTtl({
 });
 console.log('seeded keys:', [...cache.keys()]); // ['a', 'b']
 
-const bounded = new MapTtl({
+const bounded = new ExpiredMap({
   defaultTtl: 10_000,
   maxSize: 2,
   entries: [
@@ -27,7 +27,7 @@ const source = new Map([
   ['x', 10],
   ['y', 20],
 ]);
-const cloned = new MapTtl({ defaultTtl: 10_000, entries: source });
+const cloned = new ExpiredMap({ defaultTtl: 10_000, entries: source });
 console.log('cloned keys:', [...cloned.keys()]); // ['x', 'y']
 console.log('cloned get(x):', cloned.get('x')); // 10
 

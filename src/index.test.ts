@@ -1,197 +1,219 @@
-import { describe, it } from 'node:test';
-import assert from 'node:assert/strict';
-import { MapTtl } from './index.ts';
+import { test, mock, beforeEach, afterEach } from "node:test";
+import assert from "node:assert/strict";
+import { ExpiredMap } from "./index.ts";
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+beforeEach(() =>
+  mock.timers.enable({ apis: ["Date", "setInterval"], now: 1_000 }),
+);
+afterEach(() => mock.timers.reset());
+const tick = (ms: number) => mock.timers.tick(ms);
 
-describe('constructor', () => {
-  it('works with no options (5 min default, unbounded, lru)', () => {
-    const cache = new MapTtl<string, string>();
-    cache.set('k', 'v');
-    assert.equal(cache.get('k'), 'v');
-    assert.equal(cache.has('k'), true);
-    assert.equal(cache.size, 1);
-    cache.stop();
-  });
-
-  it('throws RangeError for maxSize < 1', () => {
-    assert.throws(() => new MapTtl({ maxSize: 0 }), RangeError);
-    assert.throws(() => new MapTtl({ maxSize: -5 }), RangeError);
-  });
-
-  it('seeds entries from an array', () => {
-    const cache = new MapTtl<string, number>({
-      defaultTtl: 10_000,
-      entries: [
-        ['a', 1],
-        ['b', 2],
-      ],
-    });
-    assert.deepEqual([...cache.keys()], ['a', 'b']);
-    cache.stop();
-  });
-
-  it('seeds entries from a Map', () => {
-    const source = new Map<string, number>([
-      ['x', 10],
-      ['y', 20],
-    ]);
-    const cache = new MapTtl<string, number>({ defaultTtl: 10_000, entries: source });
-    assert.equal(cache.get('x'), 10);
-    assert.equal(cache.get('y'), 20);
-    cache.stop();
-  });
-
-  it('applies eviction while seeding over maxSize', () => {
-    const cache = new MapTtl<string, number>({
-      defaultTtl: 10_000,
-      maxSize: 2,
-      entries: [
-        ['a', 1],
-        ['b', 2],
-        ['c', 3],
-      ],
-    });
-    assert.equal(cache.has('a'), false);
-    assert.deepEqual([...cache.keys()], ['b', 'c']);
-    cache.stop();
-  });
+test("finite ttl expires based on insertedAt", () => {
+  const m = new ExpiredMap<string, number>({ defaultTtl: 100 });
+  m.set("a", 1);
+  tick(99);
+  assert.equal(m.get("a"), 1);
+  tick(1);
+  assert.equal(m.get("a"), undefined);
+  assert.equal(m.size, 0);
 });
 
-describe('ttl expiry', () => {
-  it('expires entries after defaultTtl (lazy, no start needed)', async () => {
-    const cache = new MapTtl<string, number>({ defaultTtl: 50 });
-    cache.set('x', 1);
-    assert.equal(cache.get('x'), 1);
-    await sleep(120);
-    assert.equal(cache.get('x'), undefined);
-    assert.equal(cache.has('x'), false);
-    assert.equal(cache.size, 0);
-    cache.stop();
-  });
-
-  it('supports per-key ttl override', async () => {
-    const cache = new MapTtl<string, number>({ defaultTtl: 500 });
-    cache.set('fast', 1, 50);
-    cache.set('slow', 2);
-    await sleep(150);
-    assert.equal(cache.get('fast'), undefined);
-    assert.equal(cache.get('slow'), 2);
-    cache.stop();
-  });
-
-  it('refreshes ttl on overwrite of a live key', async () => {
-    const cache = new MapTtl<string, number>({ defaultTtl: 120 });
-    cache.set('k', 1);
-    await sleep(80);
-    cache.set('k', 2); // refresh
-    await sleep(80);
-    assert.equal(cache.get('k'), 2);
-    await sleep(120);
-    assert.equal(cache.get('k'), undefined);
-    cache.stop();
-  });
-
-  it('get on missing key returns undefined', () => {
-    const cache = new MapTtl<string, number>();
-    assert.equal(cache.get('missing'), undefined);
-    assert.equal(cache.has('missing'), false);
-    cache.stop();
-  });
+test("Infinity defaultTtl never expires", () => {
+  const m = new ExpiredMap<string, number>({ defaultTtl: Infinity });
+  m.set("a", 1);
+  tick(1e12);
+  assert.equal(m.has("a"), true);
+  assert.equal(m.get("a"), 1);
 });
 
-describe('delete / clear', () => {
-  it('delete removes value and metadata', () => {
-    const cache = new MapTtl<string, number>({ defaultTtl: 10_000 });
-    cache.set('k', 1);
-    assert.equal(cache.delete('k'), true);
-    assert.equal(cache.has('k'), false);
-    assert.equal(cache.size, 0);
-    cache.stop();
-  });
-
-  it('clear empties the map', () => {
-    const cache = new MapTtl<string, number>({ defaultTtl: 10_000 });
-    cache.set('a', 1);
-    cache.set('b', 2);
-    cache.clear();
-    assert.equal(cache.size, 0);
-    cache.stop();
-  });
+test("per-call Infinity ttl overrides finite default", () => {
+  const m = new ExpiredMap<string, number>({ defaultTtl: 100 });
+  m.set("forever", 1, Infinity);
+  m.set("temp", 2);
+  tick(1000);
+  assert.equal(m.get("forever"), 1);
+  assert.equal(m.get("temp"), undefined);
 });
 
-describe('eviction', () => {
-  it('lru evicts least recently used', () => {
-    const cache = new MapTtl<string, number>({ maxSize: 2, strategy: 'lru' });
-    cache.set('a', 1);
-    cache.set('b', 2);
-    cache.get('a'); // 'a' is now MRU
-    cache.set('c', 3); // evicts 'b'
-    assert.equal(cache.has('b'), false);
-    assert.equal(cache.has('a'), true);
-    assert.equal(cache.has('c'), true);
-    cache.stop();
+test("per-call finite ttl overrides Infinity default (purge must still run)", () => {
+  const m = new ExpiredMap<string, number>({
+    defaultTtl: Infinity,
+    checkInterval: 50,
   });
-
-  it('lfu evicts lowest frequency, ties break oldest-first', () => {
-    const cache = new MapTtl<string, number>({ maxSize: 2, strategy: 'lfu' });
-    cache.set('a', 1);
-    cache.set('b', 2);
-    cache.get('a');
-    cache.get('a'); // a:3, b:1
-    cache.set('c', 3); // evicts 'b'
-    assert.equal(cache.has('b'), false);
-    assert.equal(cache.has('a'), true);
-    cache.stop();
-  });
-
-  it('has() does not affect lru recency', () => {
-    const cache = new MapTtl<string, number>({ maxSize: 2, strategy: 'lru' });
-    cache.set('a', 1);
-    cache.set('b', 2);
-    cache.has('a'); // must not refresh
-    cache.set('c', 3); // evicts 'a'
-    assert.equal(cache.has('a'), false);
-    cache.stop();
-  });
-
-  it('purges expired entries before evicting live ones', async () => {
-    const cache = new MapTtl<string, number>({ defaultTtl: 10_000, maxSize: 2 });
-    cache.set('stale', 1, 40);
-    cache.set('live', 2);
-    await sleep(100);
-    cache.set('new', 3); // 'stale' purged first, no live eviction
-    assert.equal(cache.has('live'), true);
-    assert.equal(cache.has('new'), true);
-    assert.equal(cache.size, 2);
-    cache.stop();
-  });
+  m.start();
+  m.set("temp", 1, 100);
+  m.set("keep", 2);
+  tick(150);
+  assert.equal(m.size, 1); // purged by interval, not just lazily
+  assert.equal(m.get("keep"), 2);
+  m.stop();
 });
 
-describe('background sweep', () => {
-  it('does not sweep without start()', async () => {
-    const cache = new MapTtl<string, number>({ defaultTtl: 40 });
-    cache.set('z', 1);
-    await sleep(100);
-    assert.equal(cache.size, 1); // expired but unswept
-    assert.equal(cache.get('z'), undefined); // deleted on access
-    cache.stop();
-  });
+test("overwriting resets insertedAt and ttl", () => {
+  const m = new ExpiredMap<string, number>({ defaultTtl: 100 });
+  m.set("a", 1);
+  tick(80);
+  m.set("a", 2);
+  tick(80);
+  assert.equal(m.get("a"), 2);
+  tick(20);
+  assert.equal(m.get("a"), undefined);
+});
 
-  it('start() purges expired keys without reads; stop() halts it', async () => {
-    const cache = new MapTtl<string, number>({ defaultTtl: 50, checkInterval: 20 });
-    cache.set('t', 1);
-    const returned = cache.start();
-    assert.equal(returned, cache); // chainable
-    await sleep(150);
-    assert.equal(cache.size, 0);
-    cache.stop();
-  });
+test("set over an expired key replaces it as new", () => {
+  const m = new ExpiredMap<string, number>({ defaultTtl: 100 });
+  m.set("a", 1);
+  tick(100);
+  m.set("a", 2);
+  assert.equal(m.get("a"), 2);
+  assert.equal(m.size, 1);
+});
 
-  it('start() is idempotent', () => {
-    const cache = new MapTtl<string, number>({ defaultTtl: 10_000 });
-    assert.equal(cache.start(), cache);
-    assert.equal(cache.start(), cache);
-    cache.stop();
+test("background purge removes expired entries", () => {
+  const m = new ExpiredMap<string, number>({
+    defaultTtl: 100,
+    checkInterval: 40,
   });
+  m.start();
+  m.set("a", 1);
+  tick(120);
+  assert.equal(m.size, 0);
+  m.stop();
+});
+
+test("start() is a no-op when checkInterval is Infinity; stop() is safe", () => {
+  const m = new ExpiredMap<string, number>({ defaultTtl: Infinity });
+  m.start();
+  m.stop();
+  assert.equal(m.set("a", 1).get("a"), 1);
+});
+
+test("LRU eviction", () => {
+  const m = new ExpiredMap<string, number>({
+    maxSize: 2,
+    strategy: "lru",
+    defaultTtl: Infinity,
+  });
+  m.set("a", 1);
+  m.set("b", 2);
+  m.get("a");
+  m.set("c", 3);
+  assert.deepEqual([...m.keys()], ["a", "c"]);
+});
+
+test("LFU eviction with Infinity ttl; ties go to oldest", () => {
+  const m = new ExpiredMap<string, number>({
+    maxSize: 2,
+    strategy: "lfu",
+    defaultTtl: Infinity,
+  });
+  m.set("a", 1);
+  m.set("b", 2);
+  m.get("b");
+  m.set("c", 3);
+  assert.deepEqual([...m.keys()].sort(), ["b", "c"]);
+});
+
+test("eviction drops expired entries before live ones", () => {
+  const m = new ExpiredMap<string, number>({
+    maxSize: 2,
+    strategy: "lru",
+    defaultTtl: Infinity,
+  });
+  m.set("old", 1, 50);
+  m.set("live", 2);
+  tick(60);
+  m.set("new", 3);
+  assert.deepEqual([...m.keys()].sort(), ["live", "new"]);
+});
+
+test("falsy keys (0, undefined) can be evicted", () => {
+  const m = new ExpiredMap<number | undefined, string>({
+    maxSize: 1,
+    strategy: "lru",
+    defaultTtl: Infinity,
+  });
+  m.set(undefined, "u");
+  m.set(0, "z");
+  assert.equal(m.size, 1);
+  assert.equal(m.has(undefined), false);
+  assert.equal(m.get(0), "z");
+});
+
+test("constructor entries + validation", () => {
+  const m = new ExpiredMap<string, number>({
+    entries: [
+      ["a", 1],
+      ["b", 2],
+    ],
+    defaultTtl: Infinity,
+  });
+  assert.equal(m.size, 2);
+  assert.throws(() => new ExpiredMap({ maxSize: 0 }), RangeError);
+});
+
+test("FIFO is the default when maxSize is set without a strategy", () => {
+  const m = new ExpiredMap<string, number>({
+    maxSize: 2,
+    defaultTtl: Infinity,
+  });
+  m.set("a", 1);
+  tick(1);
+  m.set("b", 2);
+  tick(1);
+  m.get("a");
+  m.get("a"); // reads must NOT save "a" under FIFO
+  m.set("c", 3);
+  assert.deepEqual([...m.keys()].sort(), ["b", "c"]);
+});
+
+test("explicit fifo evicts lowest insertedAt, ignoring Map order", () => {
+  const m = new ExpiredMap<string, number>({
+    maxSize: 2,
+    strategy: "fifo",
+    defaultTtl: Infinity,
+  });
+  m.set("a", 1);
+  tick(5);
+  m.set("b", 2);
+  tick(5);
+  m.set("a", 10); // rewrite refreshes insertedAt -> "b" is now oldest
+  tick(5);
+  m.set("c", 3);
+  assert.deepEqual([...m.keys()].sort(), ["a", "c"]);
+});
+
+test("LFU ties break on oldest insertedAt", () => {
+  const m = new ExpiredMap<string, number>({
+    maxSize: 2,
+    strategy: "lfu",
+    defaultTtl: Infinity,
+  });
+  m.set("a", 1);
+  tick(5);
+  m.set("b", 2);
+  tick(5);
+  m.set("c", 3); // a and b tie at freq 1 -> a is older
+  assert.deepEqual([...m.keys()].sort(), ["b", "c"]);
+});
+
+test("ttl 0 expires immediately (no truthiness bug)", () => {
+  const m = new ExpiredMap<string, number>({ defaultTtl: Infinity });
+  m.set("a", 1, 0);
+  assert.equal(m.get("a"), undefined);
+});
+
+test("Infinity ttl stores no ttl and never expires; overwrite w/ Infinity too", () => {
+  const m = new ExpiredMap<string, number>({ defaultTtl: 100 });
+  m.set("a", 1);
+  m.set("a", 2, Infinity);
+  tick(1e9);
+  assert.equal(m.get("a"), 2);
+});
+
+test("set() rejects NaN or negative ttl", () => {
+  const m = new ExpiredMap<string, number>({ defaultTtl: 100 });
+  assert.throws(() => m.set("a", 1, NaN), RangeError);
+  assert.throws(() => m.set("a", 1, -1), RangeError);
+  assert.equal(m.size, 0); // rejected write stores nothing
 });
