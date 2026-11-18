@@ -85,7 +85,7 @@ export class ExpiredMap<K, V> extends Map<K, V> {
   }
 
   /**
-   * Stores a value with a TTL, replacing any live entry at the key and evicting when the map is full.
+   * Stores a value under the key and evicts when adding a new key would exceed maxSize. Re-setting a live key refreshes its TTL.
    *
    * @param key - The key to set.
    * @param value - The value to store.

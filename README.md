@@ -1,6 +1,6 @@
 # expired-map
 
-A `Map` with per-entry TTL expiration and optional bounded-size eviction (`fifo` / `lru` / `lfu`). Drop-in replacement for `Map` that auto-deletes stale keys.
+A `Map` with per-entry TTL expiration and optional bounded-size eviction (`fifo` / `lru` / `lfu`). Drop-in replacement for `Map` that drops stale keys lazily on access or via a background sweep.
 
 Repository: https://github.com/rayenboussayed/expired-map
 
@@ -111,7 +111,7 @@ const cloned = new ExpiredMap<string, number>({ defaultTtl: 10_000, entries: sou
 
 ## Examples
 
-Runnable demos live in [`examples/`](https://github.com/rayenboussayed/expired-map/tree/main/examples) (run from the package root, imports from `dist/`):
+Runnable demos live in [`examples/`](https://github.com/rayenboussayed/expired-map/tree/main/examples) (run from the package root; `npm run build` first since they import from `dist/`):
 
 ```bash
 node examples/basic.mjs
@@ -127,7 +127,7 @@ Generated per-symbol API docs (with `src:`/`dist:` line pointers; `dist:` lines 
 
 ### `new ExpiredMap({ defaultTtl?, entries?, checkInterval?, maxSize?, strategy? } = {})`
 
-All options optional — `new ExpiredMap()` uses 5 min TTL, unbounded (no eviction happens). `strategy` defaults to `'fifo'` and eviction runs only once `maxSize` is reached; pass `'lru'` or `'lfu'` explicitly for recency/frequency tracking. `defaultTtl: Infinity` means entries never expire (background purge is skipped, unless `checkInterval` is set).
+All options optional — `new ExpiredMap()` uses 5 min TTL, unbounded (no eviction happens). `strategy` defaults to `'fifo'` and affects eviction only once `maxSize` is reached (`lru` rearranges Map iteration on every hit regardless); pass `'lru'` or `'lfu'` explicitly for recency/frequency tracking. `defaultTtl: Infinity` means entries never expire (background purge is skipped, unless `checkInterval` is set to a finite value).
 
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -149,7 +149,7 @@ All options optional — `new ExpiredMap()` uses 5 min TTL, unbounded (no evicti
 | `start()` | Starts background `purgeExpired()` sweep; no-op if running; returns `this` |
 | `stop()` | Stops background sweep; no-op if not running |
 
-Expiry is absolute from `set()` — `get()` does not extend TTL (it only affects eviction order/frequency).
+Expiry is absolute from `set()` — `get()` does not extend TTL (it affects eviction order/frequency, and for `lru` it rearranges Map iteration order).
 
 Eviction order: `fifo` evicts oldest-inserted (reads don't affect it); `lru` moves a key to the end on `get()` and on `set()`-overwrite; `lfu` counts `set()`-overwrite and `get()` as uses, ties break oldest-first.
 

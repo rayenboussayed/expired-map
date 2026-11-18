@@ -52,7 +52,7 @@ dist: dist/index.js:42
 <a name="ExpiredMap+set"></a>
 
 ### expiredMap.set(key, value, [ttl]) ⇒ <code>this</code>
-Stores a value with a TTL, replacing any live entry at the key and evicting when the map is full.
+Stores a value under the key and evicts when adding a new key would exceed maxSize. Re-setting a live key refreshes its TTL.
 
 **Kind**: instance method of [<code>ExpiredMap</code>](#ExpiredMap)  
 **Returns**: <code>this</code> - The instance, for chaining.  
