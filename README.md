@@ -127,14 +127,14 @@ Generated per-symbol API docs (with `src:`/`dist:` line pointers; `dist:` lines 
 
 ### `new ExpiredMap({ defaultTtl?, entries?, checkInterval?, maxSize?, strategy? } = {})`
 
-All options optional — `new ExpiredMap()` uses 5 min TTL, unbounded (no eviction happens). `strategy` defaults to `'fifo'` and only matters once `maxSize` is reached; pass `'lru'` or `'lfu'` explicitly for recency/frequency tracking. `defaultTtl: Infinity` means entries never expire (background purge is skipped, unless `checkInterval` is set).
+All options optional — `new ExpiredMap()` uses 5 min TTL, unbounded (no eviction happens). `strategy` defaults to `'fifo'` and eviction runs only once `maxSize` is reached; pass `'lru'` or `'lfu'` explicitly for recency/frequency tracking. `defaultTtl: Infinity` means entries never expire (background purge is skipped, unless `checkInterval` is set).
 
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
 | `defaultTtl` | `number` | `300_000` (5 min) | Default TTL in ms applied by `set()`; `Infinity` = never expires |
 | `entries` | `Iterable<readonly [K, V]> \| Map<K, V>` | — | Initial entries, each set with `defaultTtl` |
 | `checkInterval` | `number` | `defaultTtl` | Background sweep period in ms (used by `start()`); must be `>= 1`, else `RangeError`; `start()` is a no-op when it is `Infinity` |
-| `maxSize` | `number` | `Infinity` | Max live entries; must be `>= 1`, else `RangeError`; `Infinity` = unbounded (no eviction happens; `lru` iteration-order moves and `lfu` counts still run on access) |
+| `maxSize` | `number` | `Infinity` | Max live entries; must be `>= 1`, else `RangeError`; `Infinity` = unbounded (no eviction happens; `lru` still rearranges iteration order on access) |
 | `strategy` | `'fifo' \| 'lru' \| 'lfu'` | `'fifo'` | Eviction policy when `maxSize` is reached |
 
 ### Methods
@@ -142,7 +142,7 @@ All options optional — `new ExpiredMap()` uses 5 min TTL, unbounded (no evicti
 | Method | Behavior |
 | --- | --- |
 | `set(key, value, ttl = defaultTtl)` | Store value, expiry = `Date.now() + ttl`; live-key overwrite refreshes TTL (expired-key overwrite replaces it with frequency reset); evicts if full |
-| `get(key)` | Returns `undefined` + deletes if expired/missing; on hit, `lru` re-inserts as MRU, `lfu` bumps frequency (order/frequency changes still happen when unbounded; they matter for eviction only when `maxSize` is reached) |
+| `get(key)` | Returns `undefined` + deletes if expired/missing; on hit, `lru` re-inserts as MRU (this reorders Map iteration even when unbounded); `lfu` counts the hit for eviction when bounded |
 | `has(key)` | Returns `false` + deletes if expired, else `Map.has` (does not affect `lru`/`lfu` recency) |
 | `delete(key)` | Removes value + its metadata |
 | `clear()` | Removes all values + metadata (timer keeps running) |

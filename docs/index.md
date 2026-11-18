@@ -30,7 +30,7 @@ dist: dist/index.js:19
 | [options.defaultTtl] | <code>number</code> | <code>300000</code> | Default TTL in ms applied by set(). Infinity means entries never expire. |
 | [options.entries] | <code>Iterable.&lt;Array.&lt;K, V&gt;&gt;</code> \| <code>Map.&lt;K, V&gt;</code> |  | Initial entries (iterable of `[key, value]` pairs, or a `Map`), each set with defaultTtl. |
 | [options.checkInterval] | <code>number</code> | <code>defaultTtl</code> | How often the background sweep runs (ms). Defaults to defaultTtl. Must be >= 1, else RangeError. start() is a no-op when Infinity. |
-| [options.maxSize] | <code>number</code> | <code>Infinity</code> | Max live entries. Must be >= 1, else RangeError. Infinity means unbounded: no eviction happens, although `lru` hits still move keys to the end of iteration order and `lfu` still counts them. |
+| [options.maxSize] | <code>number</code> | <code>Infinity</code> | Max live entries. Must be >= 1, else RangeError. Infinity means unbounded: no eviction happens; `lru` still moves keys to the end of iteration order on access. |
 | [options.strategy] | <code>string</code> | <code>&quot;fifo&quot;</code> | Eviction policy once maxSize is reached: must be one of `fifo`, `lru`, `lfu`. `fifo` evicts the entry with the oldest insertedAt (set() refreshes it), `lru` evicts the least recently used, `lfu` evicts the least frequently used (ties break oldest-first). |
 
 **Example**  

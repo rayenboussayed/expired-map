@@ -217,3 +217,48 @@ test("set() rejects NaN or negative ttl", () => {
   assert.throws(() => m.set("a", 1, -1), RangeError);
   assert.equal(m.size, 0); // rejected write stores nothing
 });
+
+test("has() deletes an expired entry and returns false", () => {
+  const m = new ExpiredMap<string, number>({ defaultTtl: 100 });
+  m.set("a", 1);
+  tick(100);
+  assert.equal(m.has("a"), false);
+  assert.equal(m.size, 0);
+});
+
+test("clear() empties values and metadata", () => {
+  const m = new ExpiredMap<string, number>({ defaultTtl: 100 });
+  m.set("a", 1);
+  m.set("b", 2);
+  m.clear();
+  assert.equal(m.size, 0);
+  assert.equal(m.has("a"), false);
+  assert.equal(m.get("a"), undefined);
+});
+
+test("checkInterval below 1 throws RangeError", () => {
+  assert.throws(() => new ExpiredMap({ checkInterval: 0 }), RangeError);
+  assert.throws(() => new ExpiredMap({ checkInterval: -5 }), RangeError);
+});
+
+test("lfu overwrite bumps frequency so the overwritten key is not evicted", () => {
+  const m = new ExpiredMap<string, number>({ maxSize: 2, strategy: "lfu" });
+  m.set("a", 1);
+  m.set("b", 1);
+  m.set("a", 2); // a frequency = 2
+  m.set("c", 1); // evicts b (frequency 1), not a
+  assert.equal(m.has("a"), true);
+  assert.equal(m.has("b"), false);
+  assert.equal(m.has("c"), true);
+});
+
+test("lru set-overwrite moves the key to the most-recent position", () => {
+  const m = new ExpiredMap<string, number>({ maxSize: 2, strategy: "lru" });
+  m.set("a", 1);
+  m.set("b", 1);
+  m.set("a", 2); // a now most-recently-used
+  m.set("c", 1); // evicts b
+  assert.equal(m.has("a"), true);
+  assert.equal(m.has("b"), false);
+  assert.equal(m.has("c"), true);
+});
