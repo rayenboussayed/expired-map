@@ -16,7 +16,7 @@ const bounded = new ExpiredMap({
   entries: [
     ['a', 1],
     ['b', 2],
-    ['c', 3], // evicts 'a' (default lru, no reads yet => insertion order)
+    ['c', 3], // evicts 'a' (default fifo, oldest insertedAt)
   ],
 });
 console.log('bounded has(a):', bounded.has('a')); // false
