@@ -31,3 +31,6 @@ coverage/
 
 # agent swarm tooling (session-local)
 .agent-swarm/
+
+# mdaics render cache (regenerated on demand)
+.mdaicscache

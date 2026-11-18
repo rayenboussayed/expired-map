@@ -17,6 +17,7 @@
   ],
   "scripts": {
     "build": "tsc",
+    "docs": "npm run build && mdaics",
     "test": "node --experimental-strip-types --test src/index.test.ts",
     "prepublishOnly": "npm run build"
   },
@@ -47,6 +48,7 @@
   },
   "devDependencies": {
     "@types/node": "^26.6.4",
+    "mdaics": "^1.0.0",
     "typescript": "^6.0.3"
   }
 }
