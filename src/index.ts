@@ -28,7 +28,7 @@ type Metadata = {
  * @param {Options<K, V>} [options] - Construction options. Omitted means a default 5 minute TTL, unbounded size, and no timer armed.
  * @param {number} [options.defaultTtl=300000] - Default TTL in ms applied by set(). Infinity means entries never expire.
  * @param {Iterable<Array<K, V>> | Map<K, V>} [options.entries] - Initial entries (iterable of `[key, value]` pairs, or a `Map`), each set with defaultTtl.
- * @param {number} [options.checkInterval] - How often the background sweep runs (ms). Defaults to defaultTtl. Must be >= 1, else RangeError. start() is a no-op when Infinity.
+ * @param {number} [options.checkInterval=defaultTtl] - How often the background sweep runs (ms). Defaults to defaultTtl. Must be >= 1, else RangeError. start() is a no-op when Infinity.
  * @param {number} [options.maxSize=Infinity] - Max live entries. Must be >= 1, else RangeError. Infinity means unbounded: no eviction happens, although `lru` hits still move keys to the end of iteration order and `lfu` still counts them.
  * @param {string} [options.strategy='fifo'] - Eviction policy once maxSize is reached: `fifo` evicts the entry with the oldest insertedAt (set() refreshes it), `lru` evicts the least recently used, `lfu` evicts the least frequently used (ties break oldest-first).
  * @example @lang ts
