@@ -19,6 +19,24 @@ type Metadata = {
   frequency?: number;
 };
 
+/**
+ * `ExpiredMap<K, V>` extends `Map<K, V>` with per-entry TTL expiration and optional bounded-size
+ * eviction (`fifo` | `lru` | `lfu`). Expired entries are dropped lazily by `get`/`has`, or swept
+ * in the background after `start()` is called. A new instance never arms a timer; call `start()`
+ * to sweep in the background.
+ *
+ * @param {Options<K, V>} [options] - Construction options. Omitted means a default 5 minute TTL, unbounded size, and no timer armed.
+ * @param {number} [options.defaultTtl=300000] - Default TTL in ms applied by set(). Infinity means entries never expire.
+ * @param {Iterable<Array<K, V>> | Map<K, V>} [options.entries] - Initial entries (iterable of `[key, value]` pairs, or a `Map`), each set with defaultTtl.
+ * @param {number} [options.checkInterval] - How often the background sweep runs (ms). Defaults to defaultTtl. Must be >= 1, else RangeError. start() is a no-op when Infinity.
+ * @param {number} [options.maxSize=Infinity] - Max live entries. Must be >= 1, else RangeError. Infinity means unbounded: no eviction happens, although `lru` hits still move keys to the end of iteration order and `lfu` still counts them.
+ * @param {string} [options.strategy='fifo'] - Eviction policy once maxSize is reached: `fifo` evicts the entry with the oldest insertedAt (set() refreshes it), `lru` evicts the least recently used, `lfu` evicts the least frequently used (ties break oldest-first).
+ * @example @lang ts
+ * import { ExpiredMap } from "expired-map";
+ * const cache = new ExpiredMap<string, string>();
+ * cache.set("session", "abc");
+ * cache.get("session"); // "abc"
+ */
 export class ExpiredMap<K, V> extends Map<K, V> {
   private interval: ReturnType<typeof setInterval> | undefined;
   private isPurgingExpired = false;
@@ -53,6 +71,11 @@ export class ExpiredMap<K, V> extends Map<K, V> {
     }
   }
 
+  /**
+   * Starts the background sweep; it is idempotent, its timer is unref'd so it does not keep the Node process alive, and it is a no-op when checkInterval is Infinity.
+   *
+   * @returns {this} The instance, for chaining.
+   */
   start() {
     if (this.interval || this.checkInterval === Infinity) return this;
     this.interval = setInterval(() => this.purgeExpired(), this.checkInterval);
@@ -61,6 +84,15 @@ export class ExpiredMap<K, V> extends Map<K, V> {
     return this;
   }
 
+  /**
+   * Stores a value with a TTL, replacing any live entry at the key and evicting when the map is full.
+   *
+   * @param key - The key to set.
+   * @param value - The value to store.
+   * @param [ttl] - Per-entry TTL in ms. Defaults to defaultTtl; Infinity never expires. Must be a non-negative number, else RangeError. Re-setting a live key refreshes insertedAt; setting an expired key replaces it.
+   * @returns {this} The instance, for chaining.
+   * @throws {RangeError} - When ttl is negative or NaN.
+   */
   override set(key: K, value: V, ttl = this.defaultTtl) {
     if (Number.isNaN(ttl) || ttl < 0)
       throw new RangeError("ttl must be a non-negative number");
@@ -92,6 +124,14 @@ export class ExpiredMap<K, V> extends Map<K, V> {
     return this;
   }
 
+  /**
+   * Returns the stored value, deleting the entry first if it has expired.
+   *
+   * On a hit, `lru` moves the key to the end of Map iteration order and `lfu` increments its frequency; the order shift is visible in iteration even when unbounded, and it only matters for eviction once `maxSize` is reached. A read never extends a TTL.
+   *
+   * @param key - The key to read.
+   * @returns {V | undefined} The stored value, or undefined when the key is missing or expired.
+   */
   override get(key: K) {
     const meta = this.metadata.get(key);
     if (!meta) return;
@@ -113,6 +153,14 @@ export class ExpiredMap<K, V> extends Map<K, V> {
     return value;
   }
 
+  /**
+   * Returns whether a live entry exists; an expired entry is deleted and counts as missing.
+   *
+   * Does not affect `lru` or `lfu` order.
+   *
+   * @param key - The key to check.
+   * @returns {boolean} True when a live entry exists.
+   */
   override has(key: K) {
     if (this.isExpired(key)) {
       this.delete(key);
@@ -121,16 +169,30 @@ export class ExpiredMap<K, V> extends Map<K, V> {
     return super.has(key);
   }
 
+  /**
+   * Removes the value and its metadata.
+   *
+   * @param key - The key to delete.
+   * @returns {boolean} True when an entry was removed.
+   */
   override delete(key: K) {
     this.metadata.delete(key);
     return super.delete(key);
   }
 
+  /**
+   * Removes all values and metadata; the background timer, if running, keeps running.
+   */
   override clear() {
     this.metadata.clear();
     super.clear();
   }
 
+  /**
+   * Stops the background sweep; no-op if it is not running.
+   *
+   * @returns {this} The instance, for chaining.
+   */
   stop() {
     if (this.interval) {
       clearInterval(this.interval);
@@ -160,7 +222,10 @@ export class ExpiredMap<K, V> extends Map<K, V> {
     }
   }
 
-  /** Make room for one new entry. */
+  /**
+   * Make room for one new entry.
+   * @private
+   */
   private evict() {
     // Expired entries are free to drop, so clear those first
     this.purgeExpired();
