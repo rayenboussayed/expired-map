@@ -28,3 +28,6 @@ Thumbs.db
 # test / coverage
 coverage/
 .nyc_output/
+
+# agent swarm tooling (session-local)
+.agent-swarm/
