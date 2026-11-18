@@ -111,7 +111,7 @@ const cloned = new ExpiredMap<string, number>({ defaultTtl: 10_000, entries: sou
 
 ## Examples
 
-Runnable demos live in [`examples/`](./examples) (run from the package root, imports from `dist/`):
+Runnable demos live in [`examples/`](https://github.com/rayenboussayed/expired-map/tree/main/examples) (run from the package root, imports from `dist/`):
 
 ```bash
 node examples/basic.mjs
@@ -123,11 +123,11 @@ node examples/entries.mjs
 
 ## API
 
-Generated per-symbol API docs (with `src:`/`dist:` line pointers) live in [docs/index.md](https://github.com/rayenboussayed/expired-map/blob/main/docs/index.md). Regenerate them with `npm run docs` — that needs Node >= 22.17; the library itself still runs on Node >= 18.
+Generated per-symbol API docs (with `src:`/`dist:` line pointers; `dist:` lines match a local build, since `dist/` is gitignored) live in [docs/index.md](https://github.com/rayenboussayed/expired-map/blob/main/docs/index.md). Regenerate them with `npm run docs` — that needs Node >= 22.17; the library itself still runs on Node >= 18.
 
 ### `new ExpiredMap({ defaultTtl?, entries?, checkInterval?, maxSize?, strategy? } = {})`
 
-All options optional — `new ExpiredMap()` uses 5 min TTL, unbounded (no eviction happens). When bounded via `maxSize`, `strategy` defaults to `'fifo'`; pass `'lru'` or `'lfu'` explicitly for recency/frequency tracking. `defaultTtl: Infinity` means entries never expire (background purge is skipped).
+All options optional — `new ExpiredMap()` uses 5 min TTL, unbounded (no eviction happens). `strategy` defaults to `'fifo'` and only matters once `maxSize` is reached; pass `'lru'` or `'lfu'` explicitly for recency/frequency tracking. `defaultTtl: Infinity` means entries never expire (background purge is skipped, unless `checkInterval` is set).
 
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
